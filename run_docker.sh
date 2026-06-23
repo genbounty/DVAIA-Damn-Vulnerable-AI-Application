@@ -40,6 +40,7 @@ for arg in "$@"; do
       echo ""
       echo "Cloud modes require API keys in .env. See .env.example."
       echo "Set DVAIA_SKIP_MODE_PROMPT=1 to always skip the interactive prompt."
+      echo "Windows (PowerShell): .\\run_docker.ps1 -GeminiOnly | -OpenAIOnly | -Local"
       exit 0
       ;;
   esac
@@ -201,12 +202,13 @@ prompt_for_mode() {
   done
 }
 
-# Load .env when present (may be created interactively below)
+# Load .env when present (may be created interactively below).
+# Strip CR so Windows CRLF line endings do not suffix values (e.g. PORT=5000\r → invalid hostPort).
 load_env() {
   if [ -f .env ]; then
     set -a
     # shellcheck source=/dev/null
-    source .env 2>/dev/null || true
+    source <(tr -d '\r' < .env) 2>/dev/null || true
     set +a
   fi
 }

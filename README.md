@@ -71,6 +71,21 @@ docker compose --profile ollama down   # Stops containers (Qdrant data persists 
 
 > **Docker + Ollama:** Prefer `./run_docker.sh` over plain `docker compose up`. The script sets `OLLAMA_HOST=http://ollama:11434` inside the app container. If you set `OLLAMA_HOST=http://localhost:11480` in `.env` for host-native dev, that value breaks in-container requests (`Connection refused`). Host port **11480** maps to Ollama **11434** only for tools running on your machine, not from inside `dvaia-app`.
 
+#### Platform notes (Linux, macOS, Windows)
+
+| OS | Recommended | Command |
+|----|-------------|---------|
+| **Linux** | Docker Engine + Compose | `./run_docker.sh` |
+| **macOS** | Docker Desktop | `./run_docker.sh` |
+| **Windows** | Docker Desktop + **WSL2** | `./run_docker.sh` inside WSL |
+| **Windows (PowerShell)** | Docker Desktop | `.\run_docker.ps1 -GeminiOnly` / `-OpenAIOnly` / `-Local` |
+
+**macOS — port 5000:** macOS may bind port 5000 for AirPlay Receiver. Disable it in *System Settings → General → AirDrop & Handoff*, or set `PORT=5001` in `.env`.
+
+**Windows — line endings:** If `.env` was edited on Windows with CRLF line endings, `./run_docker.sh` strips them automatically. If you still see `invalid hostPort: 5000`, convert the file: `sed -i 's/\r$//' .env` (WSL/Linux) or save as LF in your editor. Repository templates (`.env.example`) use LF; see `.gitattributes`.
+
+**Windows — without WSL:** Use `run_docker.ps1` or `docker compose up --build` directly after setting `GEMINI_ONLY` / `OPENAI_ONLY` in `.env`.
+
 ### Option 2: Local Development (Python venv)
 
 For development or if you prefer running locally:
@@ -80,7 +95,9 @@ For development or if you prefer running locally:
 ```bash
 # 1. Create and activate virtual environment
 python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate       # Linux / macOS / WSL
+# venv\Scripts\activate        # Windows cmd
+# venv\Scripts\Activate.ps1    # Windows PowerShell
 
 # 2. Install dependencies
 pip install -r requirements.txt
