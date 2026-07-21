@@ -125,6 +125,104 @@ else {
     $composeArgs = @("compose", "--profile", "ollama", "up", "--build")
     Write-Host ""
     Write-Host "Local mode: building and running DVAIA with Ollama + Qdrant..."
+    Write-Host "Downloads first; the app will NOT start until model downloads finish."
+    Write-Host ""
+
+    function Format-Duration([int]$Seconds) {
+        $ts = [TimeSpan]::FromSeconds($Seconds)
+        if ($ts.TotalHours -ge 1) { return "{0}h{1:D2}m{2:D2}s" -f [int]$ts.TotalHours, $ts.Minutes, $ts.Seconds }
+        if ($ts.TotalMinutes -ge 1) { return "{0}m{1:D2}s" -f [int]$ts.TotalMinutes, $ts.Seconds }
+        return "{0}s" -f $ts.Seconds
+    }
+
+    Write-Host "Starting Ollama + Qdrant first..."
+    & docker compose --profile ollama up -d --build ollama qdrant
+
+    $waited = 0
+    $interval = 10
+    $maxWait = 21600  # 6 hours
+    $ready = $false
+    $models = @(
+        @{ Name = "llama3.2:3b"; Label = "~2 GB" },
+        @{ Name = "nomic-embed-text"; Label = "~275 MB" },
+        @{ Name = "qwen3:0.6b"; Label = "~400 MB" },
+        @{ Name = "qwen2.5vl:7b"; Label = "~6 GB (largest)" }
+    )
+
+    Write-Host ""
+    Write-Host "============================================================"
+    Write-Host " Waiting for Ollama model downloads before starting the app"
+    Write-Host " Total ~9-10 GB — on slow networks this can take hours"
+    Write-Host (" Timeout: {0}" -f (Format-Duration $maxWait))
+    Write-Host " Full live log: docker compose --profile ollama logs -f ollama"
+    Write-Host "============================================================"
+    Write-Host ""
+
+    while ($waited -lt $maxWait) {
+        & docker compose --profile ollama exec -T ollama test -f /tmp/dvaia-ollama-ready 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host ("All Ollama models ready (elapsed {0})." -f (Format-Duration $waited))
+            Write-Host ""
+            $ready = $true
+            break
+        }
+
+        $have = @(& docker compose --profile ollama exec -T ollama ollama list 2>$null |
+            Select-Object -Skip 1 |
+            ForEach-Object { ($_ -split '\s+')[0] })
+        $logs = & docker compose --profile ollama logs --no-log-prefix --tail 120 ollama 2>$null
+        $plain = ($logs | Out-String) -replace '\x1b\[[0-9;]*[a-zA-Z]', '' -replace "`r", ''
+        $stage = ($plain -split "`n" | Where-Object { $_ -match 'DVAIA: (pulling|done)' } | Select-Object -Last 1)
+        $layer = ($plain -split "`n" | Where-Object { $_ -match 'pulling [a-f0-9]+:' } | Select-Object -Last 1)
+
+        $doneCount = 0
+        $currentIdx = 0
+        $current = $null
+        for ($i = 0; $i -lt $models.Count; $i++) {
+            $m = $models[$i]
+            if ($have -contains $m.Name) { $doneCount++; continue }
+            if ($stage -and $stage -match 'pulling' -and $stage -match [regex]::Escape($m.Name)) {
+                $currentIdx = $i + 1
+                $current = $m
+                break
+            }
+            if ($null -eq $current) {
+                $currentIdx = $i + 1
+                $current = $m
+            }
+        }
+
+        Write-Host ("-- Ollama download  elapsed {0}  ·  models {1}/{2} complete --" -f (Format-Duration $waited), $doneCount, $models.Count)
+        if ($null -ne $current) {
+            Write-Host ""
+            Write-Host ("  >>> NOW DOWNLOADING ({0}/{1}): {2}  ({3})" -f $currentIdx, $models.Count, $current.Name, $current.Label)
+            Write-Host ""
+        }
+        for ($i = 0; $i -lt $models.Count; $i++) {
+            $m = $models[$i]
+            $n = $i + 1
+            if ($have -contains $m.Name) {
+                Write-Host ("  {0}/{1}  [OK   ] {2,-20} {3}" -f $n, $models.Count, $m.Name, $m.Label)
+            }
+            elseif ($null -ne $current -and $m.Name -eq $current.Name) {
+                Write-Host ("  {0}/{1}  [>>>  ] {2,-20} {3}  <== current" -f $n, $models.Count, $m.Name, $m.Label)
+            }
+            else {
+                Write-Host ("  {0}/{1}  [wait ] {2,-20} {3}" -f $n, $models.Count, $m.Name, $m.Label)
+            }
+        }
+        if ($layer) { Write-Host "  Progress: $($layer.Trim())" }
+        else { Write-Host "  Progress: (waiting for layer data...)" }
+        Write-Host ""
+
+        Start-Sleep -Seconds $interval
+        $waited += $interval
+    }
+    if (-not $ready) {
+        Write-Error ("Timed out after {0} waiting for Ollama models." -f (Format-Duration $maxWait))
+        exit 1
+    }
+    Write-Host "Starting DVAIA app (models already ready)..."
     Write-Host ""
 }
 

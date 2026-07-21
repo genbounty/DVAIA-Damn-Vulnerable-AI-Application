@@ -15,7 +15,7 @@ try:
 except ImportError:
     load_dotenv = None  # type: ignore
 
-DEFAULT_MODEL = "ollama:llama3.2"
+DEFAULT_MODEL = "ollama:llama3.2:3b"
 # Agentic panel: thinking model (e.g. qwen3:0.6b) for CoT visibility; override with AGENTIC_MODEL
 AGENTIC_MODEL = "qwen3:0.6b"
 # Document Injection vision path: image files sent directly to a VLM; override with VISION_MODEL

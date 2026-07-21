@@ -28,7 +28,7 @@ GEMINI_PREFIX = "gemini:"
 def _ollama_model_name(model_id: str) -> str:
     """Extract Ollama model name (strip ollama: prefix if present)."""
     name = strip_provider_prefix(model_id)
-    return name or "llama3.2"
+    return name or "llama3.2:3b"
 
 
 def _gemini_model_name(model_id: str) -> str:

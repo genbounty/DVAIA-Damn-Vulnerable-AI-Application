@@ -166,7 +166,7 @@ def api_models():
             "Optional 'llm_provider': ollama|gemini|openai selects provider defaults from Settings."
         ),
         "examples": [
-            "ollama:llama3.2",
+            "ollama:llama3.2:3b",
             "gemini:gemini-2.0-flash",
             "openai:gpt-4o-mini",
             ollama["chat"],
