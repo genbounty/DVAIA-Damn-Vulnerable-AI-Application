@@ -45,7 +45,7 @@ def _with_openai_prefix(model_name: str) -> str:
 def _normalize_ollama_id(model_id: str) -> str:
     s = (model_id or "").strip()
     if not s:
-        return f"{OLLAMA_PREFIX}llama3.2"
+        return f"{OLLAMA_PREFIX}llama3.2:3b"
     lower = s.lower()
     if lower.startswith(GEMINI_PREFIX) or lower.startswith("google:") or lower.startswith(OPENAI_PREFIX):
         return get_default_model_id()

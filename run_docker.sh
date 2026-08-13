@@ -84,7 +84,7 @@ print_local_info() {
     • RAM: 8–16 GB recommended for CPU inference
 
   Models pulled automatically on first start:
-    • llama3.2          (~2 GB)   — chat / main panels
+    • llama3.2:3b       (~2 GB)   — chat / main panels (pinned; not floating :latest)
     • nomic-embed-text  (~275 MB) — RAG embeddings
     • qwen3:0.6b        (~400 MB) — Agentic / chain-of-thought
     • qwen2.5vl:7b      (~6 GB)   — Document Injection vision
@@ -298,8 +298,147 @@ else
   COMPOSE_ARGS=(--profile ollama "${COMPOSE_ARGS[@]}")
   echo ""
   echo "Local mode: building and running DVAIA with Ollama + Qdrant..."
-  echo "First startup downloads llama3.2, nomic-embed-text, qwen3:0.6b, qwen2.5vl:7b (may take several minutes)"
+  echo "Downloads first: llama3.2:3b, nomic-embed-text, qwen3:0.6b, qwen2.5vl:7b"
+  echo "The app will NOT start until those model downloads finish."
   echo "Requirements: ~9–10 GB disk, 8–16 GB RAM recommended. See: ./run_docker.sh --help"
+  echo ""
+fi
+
+fmt_duration() {
+  local s=$1
+  local h=$((s / 3600))
+  local m=$(((s % 3600) / 60))
+  local sec=$((s % 60))
+  if [ "$h" -gt 0 ]; then
+    printf "%dh%02dm%02ds" "$h" "$m" "$sec"
+  elif [ "$m" -gt 0 ]; then
+    printf "%dm%02ds" "$m" "$sec"
+  else
+    printf "%ds" "$sec"
+  fi
+}
+
+# Strip ANSI / CR from ollama docker logs for readable progress lines.
+ollama_log_plain() {
+  docker compose --profile ollama logs --no-log-prefix --tail "$1" ollama 2>/dev/null \
+    | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' | tr -d '\r'
+}
+
+model_is_installed() {
+  # $1 = model name, $2 = ollama list names (one per line)
+  printf '%s\n' "$2" | grep -qE "^${1}(:latest)?$"
+}
+
+wait_for_ollama_models() {
+  local waited=0
+  local interval=10
+  local max_wait=21600  # 6 hours — large models on slow links
+  local have_list=""
+  local stage=""
+  local layer=""
+  local model label mark
+  local idx total done_count current_idx current_model current_label
+  # name|label — pulled in this order
+  local models=(
+    "llama3.2:3b|~2 GB"
+    "nomic-embed-text|~275 MB"
+    "qwen3:0.6b|~400 MB"
+    "qwen2.5vl:7b|~6 GB (largest)"
+  )
+  total=${#models[@]}
+
+  echo "Starting Ollama + Qdrant first..."
+  docker compose --profile ollama up -d --build ollama qdrant
+
+  echo ""
+  echo "════════════════════════════════════════════════════════════"
+  echo " Waiting for Ollama model downloads before starting the app"
+  echo " Pulls ${total} models in order (~9–10 GB total; can take hours)"
+  echo " Timeout: $(fmt_duration "$max_wait")"
+  echo " Full live log: docker compose --profile ollama logs -f ollama"
+  echo "════════════════════════════════════════════════════════════"
+  echo ""
+
+  while [ "$waited" -lt "$max_wait" ]; do
+    if docker compose --profile ollama exec -T ollama test -f /tmp/dvaia-ollama-ready 2>/dev/null; then
+      echo ""
+      echo "All ${total} Ollama models ready (elapsed $(fmt_duration "$waited"))."
+      echo ""
+      return 0
+    fi
+
+    have_list="$(docker compose --profile ollama exec -T ollama ollama list 2>/dev/null | awk 'NR>1 {print $1}')"
+    stage="$(ollama_log_plain 120 | grep -E 'DVAIA: (pulling|done)' | tail -1)"
+    layer="$(ollama_log_plain 40 | grep -E 'pulling [a-f0-9]+:' | tail -1 | sed 's/^[[:space:]]*//')"
+
+    # Prefer explicit stage line; else first not-yet-installed model (pulls are sequential).
+    current_idx=0
+    current_model=""
+    current_label=""
+    done_count=0
+    idx=0
+    for entry in "${models[@]}"; do
+      idx=$((idx + 1))
+      model="${entry%%|*}"
+      label="${entry#*|}"
+      if model_is_installed "$model" "$have_list"; then
+        done_count=$((done_count + 1))
+        continue
+      fi
+      if [ -n "$stage" ] && printf '%s\n' "$stage" | grep -q "pulling .* ${model}"; then
+        current_idx=$idx
+        current_model=$model
+        current_label=$label
+        break
+      fi
+      if [ -z "$current_model" ]; then
+        current_idx=$idx
+        current_model=$model
+        current_label=$label
+      fi
+    done
+
+    echo "── Ollama download  elapsed $(fmt_duration "$waited")  ·  models ${done_count}/${total} complete ──"
+    if [ -n "$current_model" ]; then
+      echo ""
+      echo "  >>> NOW DOWNLOADING (${current_idx}/${total}): ${current_model}  (${current_label})"
+      echo ""
+    fi
+    idx=0
+    for entry in "${models[@]}"; do
+      idx=$((idx + 1))
+      model="${entry%%|*}"
+      label="${entry#*|}"
+      if model_is_installed "$model" "$have_list"; then
+        mark="OK   "
+        printf "  %d/%d  [%s] %-20s %s\n" "$idx" "$total" "$mark" "$model" "$label"
+      elif [ "$model" = "$current_model" ]; then
+        mark=">>>  "
+        printf "  %d/%d  [%s] %-20s %s  <== current\n" "$idx" "$total" "$mark" "$model" "$label"
+      else
+        mark="wait "
+        printf "  %d/%d  [%s] %-20s %s\n" "$idx" "$total" "$mark" "$model" "$label"
+      fi
+    done
+    if [ -n "$layer" ]; then
+      echo "  Progress: $layer"
+    else
+      echo "  Progress: (waiting for layer data…)"
+    fi
+    echo ""
+
+    sleep "$interval"
+    waited=$((waited + interval))
+  done
+
+  echo "Error: timed out after $(fmt_duration "$max_wait") waiting for Ollama models."
+  echo "Check: docker compose --profile ollama logs ollama"
+  exit 1
+}
+
+if [ "$OPENAI_ONLY_MODE" != true ] && [ "$GEMINI_ONLY_MODE" != true ]; then
+  wait_for_ollama_models
+  echo "Starting DVAIA app (models already ready)..."
   echo ""
 fi
 

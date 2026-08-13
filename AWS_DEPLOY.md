@@ -34,7 +34,7 @@ This guide walks you through deploying DVAIA (Damn Vulnerable AI Application) to
 
 ### Recommended Instance Types
 
-For Ollama llama3.2 (3B model):
+For Ollama llama3.2:3b (~2GB model):
 
 | Instance Type | vCPU | RAM | Cost/Hour* | Recommendation |
 |---------------|------|-----|------------|----------------|
@@ -189,7 +189,7 @@ nano .env
 ```bash
 # Application
 PORT=5000
-DEFAULT_MODEL=ollama:llama3.2
+DEFAULT_MODEL=ollama:llama3.2:3b
 EMBEDDING_BACKEND=ollama
 
 # Security - CHANGE THIS!
@@ -245,7 +245,7 @@ With Ollama profile, startup will:
 1. Build the Flask application
 2. Download Ollama container
 3. Download Qdrant container
-4. Auto-pull llama3.2 model (~2GB, takes 2-5 minutes)
+4. Auto-pull llama3.2:3b model (~2GB, takes a few minutes)
 5. Auto-pull nomic-embed-text model (~274MB)
 
 ### Monitor Startup Progress
@@ -510,7 +510,7 @@ docker compose logs ollama
 docker compose exec ollama ollama list
 ```
 
-Should show `llama3.2` and `nomic-embed-text`.
+Should show `llama3.2:3b` and `nomic-embed-text`.
 
 **Solution:** Restart Ollama and wait for models to load:
 
@@ -537,7 +537,7 @@ Error: pull model manifest: dial tcp: lookup registry.ollama.ai...
 docker compose exec ollama ping -c 3 8.8.8.8
 
 # Manually pull model
-docker compose exec ollama ollama pull llama3.2
+docker compose exec ollama ollama pull llama3.2:3b
 ```
 
 ---

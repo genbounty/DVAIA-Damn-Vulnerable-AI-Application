@@ -33,13 +33,33 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
+        set -e
+        rm -f /tmp/dvaia-ollama-ready
         /bin/ollama serve &
         sleep 5
-        ollama pull llama3.2
+        # Pin concrete tags (not floating :latest) so lab models stay stable.
+        # Stage lines are parsed by run_docker.sh for progress UI.
+        echo "DVAIA: pulling 1/4 llama3.2:3b (~2 GB)"
+        ollama pull llama3.2:3b
+        echo "DVAIA: done 1/4 llama3.2:3b"
+        echo "DVAIA: pulling 2/4 nomic-embed-text (~275 MB)"
         ollama pull nomic-embed-text
+        echo "DVAIA: done 2/4 nomic-embed-text"
+        echo "DVAIA: pulling 3/4 qwen3:0.6b (~400 MB)"
         ollama pull qwen3:0.6b
+        echo "DVAIA: done 3/4 qwen3:0.6b"
+        echo "DVAIA: pulling 4/4 qwen2.5vl:7b (~6 GB — largest; can take a long time)"
         ollama pull qwen2.5vl:7b
+        echo "DVAIA: done 4/4 qwen2.5vl:7b"
+        touch /tmp/dvaia-ollama-ready
+        echo "DVAIA: all Ollama models ready"
         wait
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/dvaia-ollama-ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 360
+      start_period: 20s
 
   qdrant:
     image: qdrant/qdrant:latest
@@ -66,11 +86,12 @@ services:
       - GEMINI_ONLY=${GEMINI_ONLY:-false}
       - OPENAI_ONLY=${OPENAI_ONLY:-false}
       - RESET_DATA_ON_START=${RESET_DATA_ON_START:-false}
-      # Overrides .env localhost — app container must reach the ollama service by name.
-      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      # Always use Compose DNS. Do not pass through .env OLLAMA_HOST=localhost:11480
+      # (that value is for host-native runs only and causes Connection refused in-container).
+      - OLLAMA_HOST=http://ollama:11434
       - QDRANT_HOST=qdrant
       - QDRANT_PORT=6333
-      - DEFAULT_MODEL=${DEFAULT_MODEL:-ollama:llama3.2}
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-ollama:llama3.2:3b}
       - VISION_MODEL=${VISION_MODEL:-ollama:qwen2.5vl:7b}
       - AGENTIC_MODEL=${AGENTIC_MODEL:-qwen3:0.6b}
       - EMBEDDING_BACKEND=${EMBEDDING_BACKEND:-ollama}
@@ -81,7 +102,12 @@ services:
     ports:
       - "${PORT:-5000}:5000"
     depends_on:
-      - qdrant
+      qdrant:
+        condition: service_started
+      # required: false so cloud-only (no ollama profile) still starts.
+      ollama:
+        condition: service_healthy
+        required: false
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: "no"
