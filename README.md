@@ -1,8 +1,8 @@
-# DVAIA - Damn Vulnerable AI Application
+# DVAIA - Damn Vulnerable AI Application #
 
 **Interactive web interface for manual LLM security testing and vulnerability exploration.**
 
-DVAIA is similar to DVWA (Damn Vulnerable Web Application) but designed specifically for testing LLM vulnerabilities. It provides a hands-on environment to explore prompt injection, indirect attacks, and other AI security issues using **local Ollama models**, **Google Gemini**, or **OpenAI** (cloud).
+DVAIA is similar to DVWA (Damn Vulnerable Web Application) but designed specifically for testing LLM vulnerabilities. It provides a hands-on environment to explore prompt injection, indirect attacks, and other AI security issues using **local Ollama models**, **Google Gemini**, or **OpenAI** (cloud). 
 
 ![DVAIA web interface — attack panels, Settings, and payload generation](damn-vulnerable-ai-application-dvaia.jpg)
 
