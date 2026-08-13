@@ -1,6 +1,6 @@
 # DVAIA Docker Compose wrapper for Windows (PowerShell).
 # Prefer WSL2 + ./run_docker.sh when possible; use this from PowerShell or cmd.
-
+# This is a test comment
 param(
     [switch]$GeminiOnly,
     [switch]$OpenAIOnly,

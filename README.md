@@ -1,8 +1,8 @@
-# DVAIA - Damn Vulnerable AI Application
+# DVAIA - Damn Vulnerable AI Application #
 
 **Open-source lab for LLM red teaming, AI agent testing, RAG security testing, and multimodal payload generation.**
 
-[DVAIA](https://github.com/airtasystems/DVAIA-Damn-Vulnerable-AI-Application) (Damn Vulnerable AI Application) is the DVWA-style playground for **LLM security testing** and **adversarial AI research**. Use it to practice **prompt injection**, **jailbreaks**, **indirect injection**, **RAG poisoning**, **AI agent / tool-use abuse**, and **multimodal attacks** against local **Ollama** models or cloud backends (**Google Gemini**, **OpenAI**).
+DVAIA is similar to DVWA (Damn Vulnerable Web Application) but designed specifically for testing LLM vulnerabilities. It provides a hands-on environment to explore prompt injection, indirect attacks, and other AI security issues using **local Ollama models**, **Google Gemini**, or **OpenAI** (cloud). 
 
 Hands-on panels cover the same surfaces AI whitehats and LLM red teamers hunt in the wild: chatbots, retrieval-augmented generation (RAG), document/vision/audio pipelines, template breakouts, and agentic tool calling - before you graduate to production-style ops with [Genbounty LLM Hunter](https://genbounty.com/llm-hunter).
 
